@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: reserva
+
+app:
+  jwt:
+    # Solo para dev/prueba técnica. En un entorno real esto se inyecta por variable de entorno
+    # (JWT_SECRET), nunca se versiona un secreto real.
+    secret: ${JWT_SECRET:+D1cG5MDllZyifxJHcVSOcA0dMH+FvmJIvRqTFBvoVjPd49iEnaqoKHtuJyIEyor}
+    expiration-minutes: 60
