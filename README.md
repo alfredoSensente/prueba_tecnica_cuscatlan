@@ -181,6 +181,20 @@ El secreto de firma (`app.jwt.secret`) tiene un valor por defecto en `applicatio
 para desarrollo**; se sobreescribe con la variable de entorno `JWT_SECRET` en cualquier entorno
 real — nunca se versiona un secreto de producción.
 
+#### Usuario ADMIN por defecto (solo dev)
+
+Como el registro público (`POST /api/auth/register`) siempre crea un `USER`, hace falta otra vía
+para tener un primer `ADMIN` con el que probar los endpoints restringidos a ese rol (CRUD de
+`Space`, por ejemplo). `AdminSeedRunner` crea uno automáticamente al arrancar la app, si no existe
+ya (idempotente, por email):
+
+- Email: `admin@reserva.local`
+- Password: `Admin123!`
+
+Configurable vía `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` / `ADMIN_SEED_ENABLED`. En un entorno
+real se desactivaría (`ADMIN_SEED_ENABLED=false`) y el alta de administradores se haría por otra
+vía administrativa, no por seed automático.
+
 ### Modularización de Spring Boot 4 (gotchas encontrados)
 
 Boot 4 partió `spring-boot-autoconfigure` en módulos por feature. Ya nos mordió dos veces durante

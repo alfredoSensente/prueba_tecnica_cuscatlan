@@ -8,3 +8,11 @@ app:
     # (JWT_SECRET), nunca se versiona un secreto real.
     secret: ${JWT_SECRET:+D1cG5MDllZyifxJHcVSOcA0dMH+FvmJIvRqTFBvoVjPd49iEnaqoKHtuJyIEyor}
     expiration-minutes: 60
+  admin-seed:
+    # Crea un ADMIN al arrancar si no existe ya (idempotente, por email). Solo para
+    # dev/prueba técnica: es el único mecanismo para tener un primer ADMIN sin signup
+    # público. En un entorno real esto se desactiva (ADMIN_SEED_ENABLED=false) y el
+    # alta de admins se hace por otra vía administrativa.
+    enabled: ${ADMIN_SEED_ENABLED:true}
+    email: ${ADMIN_SEED_EMAIL:admin@reserva.local}
+    password: ${ADMIN_SEED_PASSWORD:Admin123!}
