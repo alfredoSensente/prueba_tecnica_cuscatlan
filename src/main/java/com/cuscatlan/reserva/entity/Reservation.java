@@ -62,8 +62,7 @@ public class Reservation {
     private BigDecimal totalPrice;
 
     @Version
-    @Builder.Default
-    private Integer version = 0;
+    private Integer version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

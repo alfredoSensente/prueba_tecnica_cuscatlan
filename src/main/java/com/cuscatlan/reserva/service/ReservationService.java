@@ -6,6 +6,7 @@ import com.cuscatlan.reserva.entity.Reservation;
 import com.cuscatlan.reserva.entity.ReservationStatus;
 import com.cuscatlan.reserva.entity.Space;
 import com.cuscatlan.reserva.entity.User;
+import com.cuscatlan.reserva.event.ReservationConfirmationEvent;
 import com.cuscatlan.reserva.exception.OverlappingReservationException;
 import com.cuscatlan.reserva.exception.ReservationNotFoundException;
 import com.cuscatlan.reserva.exception.SpaceNotFoundException;
@@ -13,12 +14,14 @@ import com.cuscatlan.reserva.mapper.ReservationMapper;
 import com.cuscatlan.reserva.repository.ReservationRepository;
 import com.cuscatlan.reserva.repository.SpaceRepository;
 import com.cuscatlan.reserva.repository.UserRepository;
+import com.cuscatlan.reserva.state.ReservationState;
 import com.cuscatlan.reserva.state.ReservationStates;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -33,17 +36,23 @@ public class ReservationService {
     private final SpaceRepository spaceRepository;
     private final UserRepository userRepository;
     private final ReservationMapper reservationMapper;
+    private final PaymentValidationService paymentValidationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ReservationService(
             ReservationRepository reservationRepository,
             SpaceRepository spaceRepository,
             UserRepository userRepository,
-            ReservationMapper reservationMapper
+            ReservationMapper reservationMapper,
+            PaymentValidationService paymentValidationService,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.reservationRepository = reservationRepository;
         this.spaceRepository = spaceRepository;
         this.userRepository = userRepository;
         this.reservationMapper = reservationMapper;
+        this.paymentValidationService = paymentValidationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -65,8 +74,8 @@ public class ReservationService {
                 .totalPrice(calculateTotalPrice(space, request.startDatetime(), request.endDatetime()))
                 .build();
 
-        reservationRepository.save(reservation);
-        return reservationMapper.toResponse(reservation);
+        Reservation saved = reservationRepository.save(reservation);
+        return reservationMapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +105,26 @@ public class ReservationService {
         assertVisible(reservation, authentication);
 
         ReservationStates.of(reservation.getStatus()).cancel(reservation);
+
+        return reservationMapper.toResponse(reservation);
+    }
+
+    @Transactional
+    public ReservationResponse confirm(Long id, Authentication authentication) {
+        Reservation reservation = getOrThrow(id);
+        assertVisible(reservation, authentication);
+
+        ReservationState state = ReservationStates.of(reservation.getStatus());
+        boolean approved = paymentValidationService.validate(reservation);
+
+        if (approved) {
+            state.confirm(reservation);
+        } else {
+            state.holdForPayment(reservation);
+        }
+
+        eventPublisher.publishEvent(new ReservationConfirmationEvent(
+                reservation.getId(), reservation.getUser().getEmail(), reservation.getStatus()));
 
         return reservationMapper.toResponse(reservation);
     }

@@ -28,7 +28,11 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",
-            "/actuator/**"
+            "/actuator/**",
+            // Simula el proveedor de pago externo: lo llama nuestro propio PaymentGatewayClient
+            // servidor-a-servidor, no un cliente autenticado de la API, por eso queda fuera del
+            // esquema de JWT igual que lo estaría un tercero real.
+            "/mock/payment-gateway/**"
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;

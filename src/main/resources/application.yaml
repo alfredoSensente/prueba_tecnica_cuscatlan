@@ -16,3 +16,41 @@ app:
     enabled: ${ADMIN_SEED_ENABLED:true}
     email: ${ADMIN_SEED_EMAIL:admin@reserva.local}
     password: ${ADMIN_SEED_PASSWORD:Admin123!}
+  payment-gateway:
+    # A dónde le pega PaymentGatewayClient para validar el pago. Por defecto apunta al
+    # propio mock de esta app (MockPaymentGatewayController) para que todo el flujo
+    # funcione sin infraestructura adicional; en tests de integración se sobreescribe
+    # para apuntar a un servidor WireMock y controlar determinísticamente fallas/timeouts.
+    base-url: ${PAYMENT_GATEWAY_BASE_URL:http://localhost:8080/mock/payment-gateway}
+    timeout: 2s
+  mock-payment-gateway:
+    # Solo dev/prueba técnica: simula inestabilidad del proveedor de pago externo.
+    # Sube failure-rate (0.0–1.0) para forzar que el circuit breaker abra y ver el
+    # fallback (PENDING_PAYMENT) en acción.
+    failure-rate: ${MOCK_PAYMENT_FAILURE_RATE:0.2}
+    delay-millis: ${MOCK_PAYMENT_DELAY_MILLIS:0}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentValidation:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true

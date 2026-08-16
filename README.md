@@ -195,11 +195,37 @@ Configurable vía `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` / `ADMIN_SEED_ENABL
 real se desactivaría (`ADMIN_SEED_ENABLED=false`) y el alta de administradores se haría por otra
 vía administrativa, no por seed automático.
 
+### Circuit breaker y confirmación de pago
+
+`POST /api/reservations/{id}/confirm` invoca `PaymentValidationService.validate(reservation)`,
+anotado con `@CircuitBreaker(name = "paymentValidation")` (resilience4j vía anotación — ver nota
+de dependencia más abajo). Esa validación le pega, vía `RestClient`, a
+`MockPaymentGatewayController` (`/mock/payment-gateway/validate`), que simula el proveedor de pago
+externo del enunciado: configurable con `MOCK_PAYMENT_FAILURE_RATE` (probabilidad de que el mock
+devuelva `503`, no un rechazo de negocio — el circuit breaker debe reaccionar a que el proveedor
+esté caído/inestable, no a que un pago puntual sea rechazado) y `MOCK_PAYMENT_DELAY_MILLIS`.
+
+- Si la validación aprueba → la reserva pasa a `CONFIRMED` (patrón State: `confirm()`).
+- Si falla (error real o circuito abierto, vía `fallbackMethod`) → la reserva pasa a
+  `PENDING_PAYMENT` (`holdForPayment()`) y la petición **igual responde `200`**, nunca falla —
+  regla de negocio explícita del enunciado.
+- Umbrales configurados en `application.yaml` (`resilience4j.circuitbreaker.instances.*`), no
+  hardcodeados: ventana de 10 llamadas, mínimo 5 para evaluar, 50% de fallas abre el circuito.
+- Verificado manualmente subiendo `MOCK_PAYMENT_FAILURE_RATE=1` en `docker-compose.yml` y
+  confirmando la misma reserva varias veces seguidas: a la 5ª falla el circuito pasa a `OPEN`
+  (visible en `/actuator/circuitbreakers` y `/actuator/health`) y el siguiente intento se rechaza
+  sin siquiera llamar a la red (`notPermittedCalls`), cayendo directo al fallback.
+
+Se dispara además una notificación asíncrona (`ReservationConfirmationEvent` +
+`@TransactionalEventListener(phase = AFTER_COMMIT)` con `@Async`) que simula el envío de un correo
+vía log — corre en otro hilo y solo después de que la transacción de confirmación ya commiteó, así
+nunca notifica un cambio de estado que después se revierte.
+
 ### Modularización de Spring Boot 4 (gotchas encontrados)
 
-Boot 4 partió `spring-boot-autoconfigure` en módulos por feature. Ya nos mordió dos veces durante
-el desarrollo — vale la pena dejarlo documentado porque cualquier receta pensada para Boot 3.x
-puede fallar en silencio:
+Boot 4 partió `spring-boot-autoconfigure` en módulos por feature. Ya nos mordió varias veces
+durante el desarrollo — vale la pena dejarlo documentado porque cualquier receta pensada para
+Boot 3.x puede fallar en silencio:
 
 - **Flyway**: `flyway-core` solo, sin `spring-boot-starter-flyway`, no auto-configura nada (la
   app arrancaba sin aplicar ninguna migración, sin error visible, hasta que Hibernate fallaba
@@ -210,6 +236,29 @@ puede fallar en silencio:
   y `RestAccessDeniedHandler` —que corren fuera del ciclo normal de Spring MVC, dentro del filtro
   de seguridad— no pueden depender de inyectar ese bean; construyen su propio `ObjectMapper` con
   `JavaTimeModule` registrado en vez de `@Autowired`.
+- **Actuator `HealthIndicator` se movió de módulo**: en Boot 3.x vivía en
+  `org.springframework.boot.actuate.health`, dentro de `spring-boot-actuator`. Boot 4 lo extrajo a
+  un módulo nuevo, `spring-boot-health`, con las clases relocadas a
+  `org.springframework.boot.health.contributor`. `resilience4j-spring-boot3:2.2.0` (la versión más
+  reciente disponible al momento de este proyecto) todavía apunta a la ruta vieja en el
+  `@ConditionalOnClass` de su propio health indicator — la condición nunca matchea, así que el
+  indicador de resilience4j no se registra y `/actuator/health` no mostraba el estado del circuit
+  breaker (aunque `/actuator/circuitbreakers` sí funcionaba, porque esa auto-configuración no
+  depende de la API de health). Solución: `CircuitBreakersHealthIndicator` propio, escrito contra
+  la API nueva (`org.springframework.boot.health.contributor.HealthIndicator`), que expone el
+  estado de cada instancia como detalle sin nunca marcar la app como `DOWN` — un circuito abierto
+  es una degradación ya manejada por el fallback, no una falla de la aplicación.
+
+### Resilience4j: `resilience4j-spring-boot3` en vez de Spring Cloud Circuit Breaker
+
+El setup inicial traía `spring-cloud-starter-circuitbreaker-resilience4j` (y el BOM
+`spring-cloud-dependencies` solo para gestionar su versión). Se reemplazó por
+`io.github.resilience4j:resilience4j-spring-boot3` porque el wrapper de Spring Cloud expone
+resilience4j vía `CircuitBreakerFactory` (programático, sin `@CircuitBreaker` declarativo) y **no**
+trae los endpoints `/actuator/circuitbreakers` / `/actuator/circuitbreakerevents` — ambos
+requeridos explícitamente para esta prueba. El starter nativo de resilience4j sí trae ambos, más
+la anotación `@CircuitBreaker` con configuración declarativa en `application.yaml`, que es lo que
+se terminó usando en `PaymentValidationService`.
 
 ## Testing
 
@@ -229,11 +278,12 @@ puede fallar en silencio:
 - [x] Repositorios Spring Data JPA (`User`, `Space`, `Reservation`)
 - [x] Spring Security + JWT (registro/login, roles `ADMIN`/`USER`, `401` vs `403` consistentes)
 - [x] `GlobalExceptionHandler` base (`409` email duplicado, `400` validación, `401`/`403` auth)
-- [ ] Máquina de estados (`Reservation`) con patrón State
-- [ ] Endpoints CRUD de espacios y reservas
-- [ ] Validación de solapamiento de reservas
-- [ ] Circuit breaker sobre validación de pago (mock/WireMock)
-- [ ] Notificación asíncrona de reserva
+- [x] CRUD de espacios (`Space`), consulta abierta a ambos roles, alta/edición/baja solo `ADMIN`
+- [x] Máquina de estados (`Reservation`) con patrón State
+- [x] Endpoints básicos de reservas (crear, listar/consultar, cancelar)
+- [x] Validación de solapamiento de reservas (service + constraint de BD como red de seguridad)
+- [x] Circuit breaker sobre validación de pago (mock propio + endpoint de confirmación)
+- [x] Notificación asíncrona de reserva (`@Async` + `@TransactionalEventListener`)
 - [ ] Endpoint de reportes con `@Cacheable`
 - [ ] Perfil `prod`
 - [ ] Tests unitarios e integración

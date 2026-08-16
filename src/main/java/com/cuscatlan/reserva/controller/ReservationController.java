@@ -46,4 +46,9 @@ public class ReservationController {
     public ResponseEntity<ReservationResponse> cancel(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(reservationService.cancel(id, authentication));
     }
+
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<ReservationResponse> confirm(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(reservationService.confirm(id, authentication));
+    }
 }

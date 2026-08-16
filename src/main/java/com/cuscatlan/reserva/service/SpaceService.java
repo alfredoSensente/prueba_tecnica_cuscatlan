@@ -25,8 +25,8 @@ public class SpaceService {
     public SpaceResponse create(SpaceRequest request) {
         Space space = spaceMapper.toEntity(request);
         space.setActive(true);
-        spaceRepository.save(space);
-        return spaceMapper.toResponse(space);
+        Space saved = spaceRepository.save(space);
+        return spaceMapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)

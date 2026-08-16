@@ -17,6 +17,11 @@ public class PendingPaymentState implements ReservationState {
     }
 
     @Override
+    public ReservationState holdForPayment(Reservation reservation) {
+        return this;
+    }
+
+    @Override
     public ReservationState cancel(Reservation reservation) {
         reservation.setStatus(ReservationStatus.CANCELLED);
         return ReservationStates.CANCELLED;
