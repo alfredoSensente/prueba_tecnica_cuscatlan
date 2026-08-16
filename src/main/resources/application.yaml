@@ -1,6 +1,11 @@
 spring:
   application:
     name: reserva
+  cache:
+    # ConcurrentMapCacheManager (en memoria) alcanza para el alcance de esta prueba;
+    # un caché distribuido (Redis) sería la opción real en un despliegue con más de
+    # una instancia de la app.
+    type: simple
 
 app:
   jwt:

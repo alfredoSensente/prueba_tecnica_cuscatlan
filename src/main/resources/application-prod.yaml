@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    com.cuscatlan.reserva: INFO
+    org.hibernate: WARN
+
+app:
+  jwt:
+    # Sin valor por defecto a propósito: si falta JWT_SECRET, el arranque falla en vez
+    # de caer silenciosamente al secreto de dev embebido en application.yaml.
+    secret: ${JWT_SECRET}
+  admin-seed:
+    # El seed automático es solo para dev/prueba técnica; en un entorno real el alta
+    # de administradores se hace por otra vía.
+    enabled: false

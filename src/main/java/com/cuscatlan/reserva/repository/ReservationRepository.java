@@ -28,4 +28,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("spaceId") Long spaceId,
             @Param("start") OffsetDateTime start,
             @Param("end") OffsetDateTime end);
+
+    @Query("""
+            SELECT r FROM Reservation r
+            WHERE r.space.id = :spaceId
+              AND r.status <> com.cuscatlan.reserva.entity.ReservationStatus.CANCELLED
+              AND r.startDatetime < :rangeEnd
+              AND r.endDatetime > :rangeStart
+            """)
+    List<Reservation> findActiveBySpaceAndRange(
+            @Param("spaceId") Long spaceId,
+            @Param("rangeStart") OffsetDateTime rangeStart,
+            @Param("rangeEnd") OffsetDateTime rangeEnd);
 }

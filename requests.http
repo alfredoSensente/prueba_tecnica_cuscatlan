@@ -1,0 +1,138 @@
+### reserva — colección de requests de ejemplo
+### Compatible con la extensión "REST Client" de VS Code y con el HTTP Client de IntelliJ/WebStorm.
+###
+### Flujo sugerido:
+###   1. Correr "Login admin (seed)" o "Register" + "Login" para obtener un token.
+###   2. Copiar el valor de "token" de la respuesta y pegarlo en @token más abajo.
+###   3. El resto de los requests ya usan {{token}} automáticamente.
+
+@baseUrl = http://localhost:8080
+@token = PEGAR_TOKEN_AQUI
+
+### =========================================================
+### Auth
+### =========================================================
+
+### Registrar un usuario nuevo (siempre crea rol USER)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "usuario@example.com",
+  "password": "Password123!"
+}
+
+### Login como usuario recién registrado
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "usuario@example.com",
+  "password": "Password123!"
+}
+
+### Login como ADMIN (usuario creado por AdminSeedRunner al arrancar la app)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@reserva.local",
+  "password": "Admin123!"
+}
+
+### =========================================================
+### Spaces — consulta abierta a ambos roles, alta/edición/baja solo ADMIN
+### =========================================================
+
+### Listar espacios activos
+GET {{baseUrl}}/api/spaces
+Authorization: Bearer {{token}}
+
+### Ver un espacio por id
+GET {{baseUrl}}/api/spaces/1
+Authorization: Bearer {{token}}
+
+### Crear espacio (requiere token de ADMIN)
+POST {{baseUrl}}/api/spaces
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Sala de reuniones A",
+  "type": "MEETING_ROOM",
+  "capacity": 6,
+  "location": "Piso 3",
+  "hourlyRate": 15.00
+}
+
+### Editar espacio (requiere token de ADMIN)
+PUT {{baseUrl}}/api/spaces/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Sala de reuniones A - renovada",
+  "type": "MEETING_ROOM",
+  "capacity": 8,
+  "location": "Piso 3",
+  "hourlyRate": 18.00
+}
+
+### Baja lógica de espacio (requiere token de ADMIN)
+DELETE {{baseUrl}}/api/spaces/1
+Authorization: Bearer {{token}}
+
+### =========================================================
+### Reservations — USER ve/gestiona las propias, ADMIN ve/gestiona todas
+### =========================================================
+
+### Crear reserva (ajustar spaceId y fechas a futuro)
+POST {{baseUrl}}/api/reservations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "spaceId": 1,
+  "startDatetime": "2026-09-01T10:00:00Z",
+  "endDatetime": "2026-09-01T12:00:00Z"
+}
+
+### Listar mis reservas (o todas, si el token es de ADMIN)
+GET {{baseUrl}}/api/reservations
+Authorization: Bearer {{token}}
+
+### Ver una reserva por id
+GET {{baseUrl}}/api/reservations/1
+Authorization: Bearer {{token}}
+
+### Confirmar reserva (dispara validación de pago vía circuit breaker)
+POST {{baseUrl}}/api/reservations/1/confirm
+Authorization: Bearer {{token}}
+
+### Cancelar reserva
+POST {{baseUrl}}/api/reservations/1/cancel
+Authorization: Bearer {{token}}
+
+### =========================================================
+### Reportes
+### =========================================================
+
+### Ocupación por espacio en un rango de fechas (cacheado)
+GET {{baseUrl}}/api/reports/occupancy?startDate=2026-09-01&endDate=2026-09-30
+Authorization: Bearer {{token}}
+
+### =========================================================
+### Observabilidad
+### =========================================================
+
+### Health general (incluye estado del circuit breaker)
+GET {{baseUrl}}/actuator/health
+
+### Estado detallado de los circuit breakers
+GET {{baseUrl}}/actuator/circuitbreakers
+
+### Eventos recientes de los circuit breakers (aperturas, transiciones, etc.)
+GET {{baseUrl}}/actuator/circuitbreakerevents
+
+### Swagger / OpenAPI
+GET {{baseUrl}}/v3/api-docs

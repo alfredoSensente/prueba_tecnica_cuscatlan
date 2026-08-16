@@ -21,6 +21,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -55,6 +56,7 @@ public class ReservationService {
         this.eventPublisher = eventPublisher;
     }
 
+    @CacheEvict(cacheNames = "occupancyReport", allEntries = true)
     @Transactional
     public ReservationResponse create(ReservationRequest request, String userEmail) {
         User user = getUserOrThrow(userEmail);
@@ -99,6 +101,7 @@ public class ReservationService {
         return reservationMapper.toResponse(reservation);
     }
 
+    @CacheEvict(cacheNames = "occupancyReport", allEntries = true)
     @Transactional
     public ReservationResponse cancel(Long id, Authentication authentication) {
         Reservation reservation = getOrThrow(id);
@@ -109,6 +112,7 @@ public class ReservationService {
         return reservationMapper.toResponse(reservation);
     }
 
+    @CacheEvict(cacheNames = "occupancyReport", allEntries = true)
     @Transactional
     public ReservationResponse confirm(Long id, Authentication authentication) {
         Reservation reservation = getOrThrow(id);

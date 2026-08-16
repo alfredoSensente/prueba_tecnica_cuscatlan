@@ -156,7 +156,11 @@ La app queda escuchando en `http://localhost:8080` conectando a Postgres en `loc
 - `docker` (`application-docker.yaml`): igual que `dev`, pero apunta al Postgres por el hostname
   interno del compose (`postgres:5432`) — es el perfil que usa el servicio `app` del
   `docker-compose.yml`.
-- `prod` (`application-prod.yaml`): pendiente de definir.
+- `prod` (`application-prod.yaml`): datasource vía `DATABASE_URL`/`DATABASE_USERNAME`/
+  `DATABASE_PASSWORD` (sin valores por defecto), `app.jwt.secret` sin fallback — si falta
+  `JWT_SECRET` el arranque falla en vez de usar el secreto de dev embebido en
+  `application.yaml` — y `admin-seed.enabled: false` (el alta de administradores no es por
+  seed automático en un entorno real).
 
 ### Esquema de base de datos y migraciones
 
@@ -221,6 +225,26 @@ Se dispara además una notificación asíncrona (`ReservationConfirmationEvent` 
 vía log — corre en otro hilo y solo después de que la transacción de confirmación ya commiteó, así
 nunca notifica un cambio de estado que después se revierte.
 
+### Reporte de ocupación (`@Cacheable`)
+
+`GET /api/reports/occupancy?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` devuelve, por cada espacio
+activo, el % de tiempo reservado dentro del rango (minutos de reservas —no `CANCELLED`— que caen
+dentro del rango, recortados a los bordes del rango, sobre el total de minutos del rango).
+
+- `@Cacheable(cacheNames = "occupancyReport", key = "#startDate + '_' + #endDate")` en
+  `ReportService`: cachea por rango de fechas exacto. `spring.cache.type: simple`
+  (`ConcurrentMapCacheManager`, en memoria) alcanza para una sola instancia; con más de una
+  instancia de la app en producción, este caché tendría que ser distribuido (Redis).
+- Invalidación: `create`, `cancel` y `confirm` de `ReservationService` llevan
+  `@CacheEvict(cacheNames = "occupancyReport", allEntries = true)`. Se optó por evictar todo el
+  caché en vez de intentar invalidar por clave (rango de fechas) específica — cualquier cambio de
+  estado de una reserva puede afectar el cálculo de cualquier rango que la contenga, y calcular
+  exactamente qué claves cacheadas se ven afectadas sería más complejo que el beneficio que
+  aportaría para el volumen de datos de esta prueba.
+- Verificado manualmente: mismo rango, mismo resultado repetido; al crear una reserva de 6h en un
+  rango de un solo día, el % pasó de `0.00` a `25.00` en la siguiente consulta (6h / 24h) — el
+  caché se invalida correctamente, no queda sirviendo el valor viejo.
+
 ### Modularización de Spring Boot 4 (gotchas encontrados)
 
 Boot 4 partió `spring-boot-autoconfigure` en módulos por feature. Ya nos mordió varias veces
@@ -284,10 +308,10 @@ se terminó usando en `PaymentValidationService`.
 - [x] Validación de solapamiento de reservas (service + constraint de BD como red de seguridad)
 - [x] Circuit breaker sobre validación de pago (mock propio + endpoint de confirmación)
 - [x] Notificación asíncrona de reserva (`@Async` + `@TransactionalEventListener`)
-- [ ] Endpoint de reportes con `@Cacheable`
-- [ ] Perfil `prod`
+- [x] Endpoint de reportes con `@Cacheable`/`@CacheEvict`
+- [x] Perfil `prod`
+- [x] Colección `.http` (`requests.http`) y colección Postman (`postman_collection.json`)
 - [ ] Tests unitarios e integración
-- [ ] Colección Postman / `.http`
 
 ## Fuera de alcance
 

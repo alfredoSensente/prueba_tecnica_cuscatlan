@@ -1,0 +1,245 @@
+{
+  "info": {
+    "name": "reserva",
+    "description": "Colección de ejemplo para el microservicio de reservas de coworking. Equivalente a requests.http.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registrar un usuario nuevo (siempre crea rol USER)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login como usuario recién registrado",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.token) { pm.collectionVariables.set('token', body.token); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login como ADMIN (usuario creado por AdminSeedRunner al arrancar la app)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@reserva.local\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.token) { pm.collectionVariables.set('token', body.token); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Spaces",
+      "item": [
+        {
+          "name": "Listar espacios activos",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/spaces", "host": ["{{baseUrl}}"], "path": ["api", "spaces"] }
+          }
+        },
+        {
+          "name": "Ver un espacio por id",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/spaces/1", "host": ["{{baseUrl}}"], "path": ["api", "spaces", "1"] }
+          }
+        },
+        {
+          "name": "Crear espacio (requiere token de ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sala de reuniones A\",\n  \"type\": \"MEETING_ROOM\",\n  \"capacity\": 6,\n  \"location\": \"Piso 3\",\n  \"hourlyRate\": 15.00\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/spaces", "host": ["{{baseUrl}}"], "path": ["api", "spaces"] }
+          }
+        },
+        {
+          "name": "Editar espacio (requiere token de ADMIN)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sala de reuniones A - renovada\",\n  \"type\": \"MEETING_ROOM\",\n  \"capacity\": 8,\n  \"location\": \"Piso 3\",\n  \"hourlyRate\": 18.00\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/spaces/1", "host": ["{{baseUrl}}"], "path": ["api", "spaces", "1"] }
+          }
+        },
+        {
+          "name": "Baja lógica de espacio (requiere token de ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/spaces/1", "host": ["{{baseUrl}}"], "path": ["api", "spaces", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Crear reserva (ajustar spaceId y fechas a futuro)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spaceId\": 1,\n  \"startDatetime\": \"2026-09-01T10:00:00Z\",\n  \"endDatetime\": \"2026-09-01T12:00:00Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/reservations", "host": ["{{baseUrl}}"], "path": ["api", "reservations"] }
+          }
+        },
+        {
+          "name": "Listar mis reservas (o todas, si el token es de ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/reservations", "host": ["{{baseUrl}}"], "path": ["api", "reservations"] }
+          }
+        },
+        {
+          "name": "Ver una reserva por id",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/reservations/1", "host": ["{{baseUrl}}"], "path": ["api", "reservations", "1"] }
+          }
+        },
+        {
+          "name": "Confirmar reserva (dispara validación de pago vía circuit breaker)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/reservations/1/confirm", "host": ["{{baseUrl}}"], "path": ["api", "reservations", "1", "confirm"] }
+          }
+        },
+        {
+          "name": "Cancelar reserva",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/reservations/1/cancel", "host": ["{{baseUrl}}"], "path": ["api", "reservations", "1", "cancel"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reportes",
+      "item": [
+        {
+          "name": "Ocupación por espacio en un rango de fechas (cacheado)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/occupancy?startDate=2026-09-01&endDate=2026-09-30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "occupancy"],
+              "query": [
+                { "key": "startDate", "value": "2026-09-01" },
+                { "key": "endDate", "value": "2026-09-30" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Observabilidad",
+      "item": [
+        {
+          "name": "Health general (incluye estado del circuit breaker)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+          }
+        },
+        {
+          "name": "Estado detallado de los circuit breakers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/circuitbreakers", "host": ["{{baseUrl}}"], "path": ["actuator", "circuitbreakers"] }
+          }
+        },
+        {
+          "name": "Eventos recientes de los circuit breakers (aperturas, transiciones, etc.)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/circuitbreakerevents", "host": ["{{baseUrl}}"], "path": ["actuator", "circuitbreakerevents"] }
+          }
+        },
+        {
+          "name": "Swagger / OpenAPI",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v3/api-docs", "host": ["{{baseUrl}}"], "path": ["v3", "api-docs"] }
+          }
+        }
+      ]
+    }
+  ]
+}
